@@ -1,79 +1,199 @@
-/* The DDD Cargo sample application modeled in CML. Note that we split the application into multiple bounded contexts. */
-ContextMap DDDSampleMap {
-	contains CargoBookingContext
-	contains VoyagePlanningContext
-	contains LocationContext
+ContextMap EcomerceMap {
+  
+  contains Productos
+  contains Compras
+  contains Pagos
+  contains Envios
+  contains Marketing
 
-	/* As Evans mentions in his book (Bounded Context chapter): The voyage planning can be seen as
-	 * separated bounded context. However, it still shares code with the booking application (CargoBookingContext).
-	 * Thus, they are in a 'Shared-Kernel' relationship.
-	 */
-	CargoBookingContext [SK]<->[SK] VoyagePlanningContext
-
-	/* Note that the splitting of the LocationContext is not mentioned in the original DDD sample of Evans.
-	 * However, locations and the management around them, can somehow be seen as a separated concept which is used by other
-	 * bounded contexts. But this is just an example, since we want to demonstrate our DSL with multiple bounded contexts.
-	 */
-	CargoBookingContext [D]<-[U,OHS,PL] LocationContext
-
-	VoyagePlanningContext [D]<-[U,OHS,PL] LocationContext
-
+  /* Define the context relationships: */
+  Productos Customer-Supplier Compras
+  Compras[D]<-[U]Pagos //Relación Conformist donde pagos se adopta a las compras
+  Envios[D,ACL]<-[U]Compras //Relacion Anticoorupcion Layer Compras(Dominante)Envios(Dependiente)
+  Marketing[D]<-[U,OHS]Productos//Relacion OHS
+  
+  
 }
 
-/* The original booking application context */
-BoundedContext CargoBookingContext {
-	Module cargo {
-		basePackage = se.citerus.dddsample.domain.model
+/* Bounded Context Definitions */
+BoundedContext Productos implements Products
+BoundedContext Compras implements Comprs
+BoundedContext Pagos implements Pags
+BoundedContext Envios implements Envis
+BoundedContext Marketing implements Products
 
-		Aggregate CargoItineraryLegDeliveryRouteSpecification {
-			Entity Cargo
-			ValueObject Delivery
-			ValueObject HandlingActivity
-			ValueObject Itinerary
-			ValueObject Leg
-			ValueObject RouteSpecification
-			enum TransportStatus {
-	            NOT_RECEIVED, IN_PORT, ONBOARD_CARRIER, CLAIMED, UNKNOWN
-			}
-			enum RoutingStatus {
-				NOT_ROUTED, ROUTED, MISROUTED
-			}
-		}
-	}
+/* Domain & Subdomain Definitions */
+  // Se define un dominio llamado Ecomerce
+Domain ECommerceContextMap  {
 
-	Module handling {
-		basePackage = se.citerus.dddsample.domain.model
+  // Se define un subdominio llamado Productos
+  Subdomain Products {
+    // Se define el tipo de subdominio: CORE_DOMAIN, SUPPORTING_DOMAIN o GENERIC_SUBDOMAIN
+    type CORE_DOMAIN
+    domainVisionStatement = "Description of subdomain"
+    
+  }
+  Subdomain Comprs {
+    type CORE_DOMAIN
+  }
 
-		Aggregate Handling {
-			DomainEvent HandlingEvent
-			ValueObject HandlingHistory
-		}
-	}
+   Subdomain Pags {
+    type SUPPORTING_DOMAIN
+  }
+
+   Subdomain Envis {
+    type SUPPORTING_DOMAIN
+  }
+}
+  
+
+
+// Se define el contexto acotado de Productos
+BoundedContext Productos {
+
+ Module Producto{
+  Aggregate Producto{// Se definen las entidades del contexto
+    Entity Producto 
+    // Se definen los atributos de la entidad
+    ValueObject id
+    ValueObject nombre
+    ValueObject precio
+    ValueObject categoria
+    ValueObject descripcion
+    ValueObject imagen
+  
+  } 
+ }
+  
 }
 
-/* We split the Voyage Planning into a separate bounded context as Evans proposes it in his book. */
-BoundedContext VoyagePlanningContext {
-	Module voyage {
-		basePackage = se.citerus.dddsample.domain.model
+// Se repite el mismo patrón para los otros contextos acotados
+BoundedContext Compras {
+  Module Compra{
+    Aggregate Compra{
 
-		Aggregate Voyage {
-			Entity Voyage
-			ValueObject CarrierMovement
-			ValueObject Schedule
-			ValueObject VoyageNumber
-		}
-	}
+    Entity Compra 
+
+        ValueObject id
+        ValueObject usuario
+        ValueObject <Producto> productos
+        ValueObject total
+        ValueObject estado
+  
+    }
+  }
+ 
 }
 
-/* Separate bounded context for managing the locations. */
-BoundedContext LocationContext {
-	Module location {
-		basePackage = se.citerus.dddsample.domain.model
+BoundedContext Pagos {
+  Module{
+    Aggregate Pago{
+         Entity Pago {
+            ValueObject id
+            Compras compra
+            ValueObject metodo
+            BigDecimal monto
+            Boolean confirmacion
+  }
+    }
+  }
+ 
+}
 
-		Aggregate Location {
-			Entity Location
-			ValueObject UnLocode
-			ValueObject LocationShared
-		}
-	}
+BoundedContext Envios {
+ Module Envio{
+  Aggregate Envio{
+    Entity Envio 
+      ValueObject id
+      Compra compra
+      ValueObject direccion
+      Date fecha
+      ValueObject seguimiento
+  
+  }
+ }
+  
+}
+
+BoundedContext Marketing {
+  // Se define el tipo de contexto: aplicación, dominio o infraestructura
+  type APPLICATION
+  
+  // Se define la tecnología de implementación: monolito, microservicio, etc.
+  implementationTechnology "Microservice"
+  
+  // Se define la API que expone el contexto
+  ServiceContract MarketingAPI {
+    // Se define el tipo de API: REST, GraphQL, etc.
+    type REST
+    
+    // Se definen los recursos que ofrece la API
+    Resource Campañas {
+      // Se definen los métodos HTTP que soporta el recurso
+      methods GET, POST, PUT, DELETE
+      
+      // Se definen los parámetros que acepta el recurso
+      parameters id, nombre, objetivo, presupuesto, duracion, estado
+      
+      // Se definen las respuestas que devuelve el recurso
+      responses 200, 201, 400, 404, 500
+    }
+    
+    Resource Anuncios {
+      methods GET, POST, PUT, DELETE
+      parameters id, campaña, producto, mensaje, imagen, canal, metricas
+      responses 200, 201, 400, 404, 500
+    }
+    
+    Resource Ofertas {
+      methods GET, POST, PUT, DELETE
+      parameters id, producto, precio, descuento, fecha, stock
+      responses 200, 201, 400, 404, 500
+    }
+    
+    Resource Cupones {
+      methods GET, POST, PUT, DELETE
+      parameters id, codigo, valor, fecha, condiciones
+      responses 200, 201, 400, 404, 500
+    }
+  }
+  
+  // Se definen las entidades del contexto
+  Entity Campaña {
+    // Se definen los atributos de la entidad
+    String id
+    String nombre
+    String objetivo
+    BigDecimal presupuesto
+    Date duracion
+    String estado
+    List<Anuncio> anuncios
+  }
+  
+  Entity Anuncio {
+    String id
+    Campaña campaña
+    Producto producto
+    String mensaje
+    String imagen
+    String canal
+    Map<String, Integer> metricas
+  }
+  
+  Entity Oferta {
+    String id
+    Producto producto
+    BigDecimal precio
+    BigDecimal descuento
+    Date fecha
+    Integer stock
+  }
+  
+  Entity Cupon {
+    String id
+    String codigo
+    BigDecimal valor
+    Date fecha
+    String condiciones
+  }
 }
